@@ -34,7 +34,11 @@ namespace Tutorial9.Controllers
             if(warehouseRequeustDTO.Amount <= 0)
                 return  BadRequest("Ammount cannot be <= 0");
 
+            if( await _dbservice.does_order_exists(warehouseRequeustDTO.IdProduct,warehouseRequeustDTO.CreatedAt,warehouseRequeustDTO.Amount) == -1)
+                return NotFound("order not found(or was compleated)");
 
+
+            await _dbservice.complete_order(warehouseRequeustDTO);
 
             return Ok(_confyguration.GetConnectionString("default"));
         }

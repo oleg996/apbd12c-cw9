@@ -1,6 +1,7 @@
 ﻿using System.Data;
 using System.Data.Common;
 using Microsoft.Data.SqlClient;
+using Tutorial9.Model;
 
 namespace Tutorial9.Services;
 
@@ -43,6 +44,7 @@ public class DbService : IDbService
         }
         catch (Exception e)
         {
+            
             await transaction.RollbackAsync();
             throw;
         }
@@ -68,10 +70,6 @@ public class DbService : IDbService
 
     public async Task<Boolean> does_product_exists(int id){
 
-
-
-        
-
         await using SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
         await using SqlCommand command = new SqlCommand("select count(*) from Product p where p.IdProduct  = @id",connection);
         
@@ -95,4 +93,106 @@ public class DbService : IDbService
 
         return false;
     }
+    public async Task<Boolean> does_warehouse_exists(int id){
+
+        await using SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
+        await using SqlCommand command = new SqlCommand("select count(*) from Warehouse w where w.idWarehouse = @id",connection);
+        
+
+        command.Parameters.Add("@id",SqlDbType.Int).Value = id;
+    
+        await connection.OpenAsync();
+
+        using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    if (reader.GetInt32(0) == 1)
+                        return true;
+
+
+                }
+            }
+
+
+
+        return false;
+    }
+
+    public async Task<int> does_order_exists(int id,DateTime date,int am){
+
+
+
+
+
+        await using SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
+        await using SqlCommand command = new SqlCommand("select IdOrder from [Order] o  where o.IdProduct  = @id and o.FulfilledAt is null and o.CreatedAt < @dt and o.Amount = @am",connection);
+        
+
+        command.Parameters.Add("@id",SqlDbType.Int).Value = id;
+        command.Parameters.Add("@dt",SqlDbType.DateTime).Value = date;
+        command.Parameters.Add("@am",SqlDbType.Int).Value = am;
+    
+        await connection.OpenAsync();
+
+        using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    return reader.GetInt32(0);
+
+
+                }
+            }
+
+
+
+        return -1;
+    }
+
+
+    
+    public async Task complete_order(WarehouseRequeustDTO warehouseRequeustDTO)
+    {
+        await using SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
+        await using SqlCommand command = new SqlCommand();
+        
+        command.Connection = connection;
+        await connection.OpenAsync();
+
+        DbTransaction transaction = await connection.BeginTransactionAsync();
+        command.Transaction = transaction as SqlTransaction;
+
+
+        int orederid = await does_order_exists(warehouseRequeustDTO.IdProduct,warehouseRequeustDTO.CreatedAt,warehouseRequeustDTO.Amount);
+
+        try
+        {
+            command.CommandText = "Insert into Product_Warehouse  (IdWarehouse, IdProduct,IdOrder,Amount,Price,CreatedAt) Values(@idw,@idp,@ido,@am, CAST((select Price from Product p  where p.IdProduct = @idp) AS INTEGER) * @am , GETDATE())	";
+            command.Parameters.AddWithValue("@idw", warehouseRequeustDTO.IdWarehouce);
+            command.Parameters.AddWithValue("@idp", warehouseRequeustDTO.IdProduct);
+            command.Parameters.AddWithValue("@ido", orederid);
+            command.Parameters.AddWithValue("@am", warehouseRequeustDTO.Amount);
+        
+            await command.ExecuteNonQueryAsync();
+        
+            command.Parameters.Clear();
+            command.CommandText = "UPDATE [Order] SET FulfilledAt = GETDATE()  WHERE IdProduct  = @id and FulfilledAt is null and CreatedAt < @dt and Amount = @am";
+            command.Parameters.AddWithValue("@id", warehouseRequeustDTO.IdProduct);
+            command.Parameters.AddWithValue("@dt", warehouseRequeustDTO.CreatedAt);
+            command.Parameters.AddWithValue("@am", warehouseRequeustDTO.Amount);
+        
+            await command.ExecuteNonQueryAsync();
+            
+            await transaction.CommitAsync();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            await transaction.RollbackAsync();
+            throw;
+        }
+        
+    }
+
 }
