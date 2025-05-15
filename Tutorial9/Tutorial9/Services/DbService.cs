@@ -152,7 +152,7 @@ public class DbService : IDbService
 
 
     
-    public async Task complete_order(WarehouseRequeustDTO warehouseRequeustDTO)
+    public async Task<int> complete_order(WarehouseRequeustDTO warehouseRequeustDTO)
     {
         await using SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
         await using SqlCommand command = new SqlCommand();
@@ -165,7 +165,7 @@ public class DbService : IDbService
 
 
         int orederid = await does_order_exists(warehouseRequeustDTO.IdProduct,warehouseRequeustDTO.CreatedAt,warehouseRequeustDTO.Amount);
-
+        int id = -1;
         try
         {
             command.CommandText = "Insert into Product_Warehouse  (IdWarehouse, IdProduct,IdOrder,Amount,Price,CreatedAt) Values(@idw,@idp,@ido,@am, CAST((select Price from Product p  where p.IdProduct = @idp) AS INTEGER) * @am , GETDATE())	";
@@ -183,16 +183,77 @@ public class DbService : IDbService
             command.Parameters.AddWithValue("@am", warehouseRequeustDTO.Amount);
         
             await command.ExecuteNonQueryAsync();
+
+
+
+            command.Parameters.Clear();
+            command.CommandText = "select @@identity";
+           
+            using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    id = (int)reader.GetDecimal(0);
+
+
+                }
+            }
+
+
+
+
             
             await transaction.CommitAsync();
+
+
         }
         catch (Exception e)
         {
-            Console.WriteLine(e);
             await transaction.RollbackAsync();
             throw;
         }
-        
+        return id;
     }
 
+
+
+    public async Task<int> compleate_order_with_procedure(WarehouseRequeustDTO warehouseRequeustDTO){
+
+        await using SqlConnection connection = new SqlConnection(_configuration.GetConnectionString("Default"));
+        await using SqlCommand command = new SqlCommand();
+        
+        command.Connection = connection;
+        await connection.OpenAsync();
+        
+        command.CommandText = "AddProductToWarehouse";
+        command.CommandType = CommandType.StoredProcedure;
+        
+        command.Parameters.AddWithValue("@IdProduct", warehouseRequeustDTO.IdProduct);
+
+        command.Parameters.AddWithValue("@IdWarehouse", warehouseRequeustDTO.IdWarehouce);
+
+        command.Parameters.AddWithValue("@Amount", warehouseRequeustDTO.Amount);
+
+        command.Parameters.AddWithValue("@CreatedAt", warehouseRequeustDTO.CreatedAt);
+
+
+        
+         using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    return (int)reader.GetDecimal(0);
+
+
+                }
+            }
+
+
+
+        return -1;
+
+
+    }
+
+   
 }

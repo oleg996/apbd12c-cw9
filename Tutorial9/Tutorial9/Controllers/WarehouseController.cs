@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Tutorial9.Model;
 using Tutorial9.Services;
@@ -38,9 +39,30 @@ namespace Tutorial9.Controllers
                 return NotFound("order not found(or was compleated)");
 
 
-            await _dbservice.complete_order(warehouseRequeustDTO);
+            int id = await _dbservice.complete_order(warehouseRequeustDTO);
 
-            return Ok(_confyguration.GetConnectionString("default"));
+
+
+
+            return Ok(id);
+        }
+        
+        [HttpPost("proc")]
+        public async Task<IActionResult> addItem_with_proc(WarehouseRequeustDTO warehouseRequeustDTO){
+           
+            Console.WriteLine(warehouseRequeustDTO);
+
+            try
+            {
+            int id = await _dbservice.compleate_order_with_procedure(warehouseRequeustDTO);
+            return Ok(id);
+            }
+            catch (SqlException e){
+                return NotFound(e.Message);
+            }
+
+
+            
         }
 
 

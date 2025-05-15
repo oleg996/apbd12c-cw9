@@ -10,5 +10,7 @@ public interface IDbService
 
     Task<int> does_order_exists(int id,DateTime date,int am);
 
-    Task complete_order(WarehouseRequeustDTO warehouseRequeustDTO);
+    Task<int> complete_order(WarehouseRequeustDTO warehouseRequeustDTO);
+
+    Task<int> compleate_order_with_procedure(WarehouseRequeustDTO warehouseRequeustDTO);
 }
